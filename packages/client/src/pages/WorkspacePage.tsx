@@ -6,7 +6,7 @@ import {
   HiOutlineTrash,
 } from 'react-icons/hi2';
 import { useAuthStore } from '../stores/authStore';
-import { listWorkspaces, listDocuments, createWorkspace, createDocument, deleteDocument } from '../lib/api';
+import { listWorkspaces, listDocuments, createWorkspace, createDocument, deleteDocument, deleteWorkspace } from '../lib/api';
 
 interface WorkspaceInfo {
   id: string;
@@ -91,6 +91,16 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
     }
   };
 
+  const handleDeleteWorkspace = async (e: React.MouseEvent, wsId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this workspace and all its documents?')) return;
+    const res = await deleteWorkspace(wsId);
+    if (res.ok) {
+      if (selectedWs === wsId) setSelectedWs(null);
+      loadWorkspaces();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-transparent text-white">
       {/* Header */}
@@ -130,16 +140,29 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
                   <button
                     key={ws.id}
                     onClick={() => setSelectedWs(ws.id)}
-                    className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-300 ${
+                    className={`group w-full px-4 py-3 rounded-xl transition-all duration-300 ${
                       selectedWs === ws.id
                         ? 'bg-white/10 border border-white/20 text-white shadow-[0_4px_20px_rgba(0,0,0,0.2)]'
                         : 'bg-transparent hover:bg-white/[0.05] text-neutral-400 border border-transparent hover:border-white/10'
                     }`}
                     id={`ws-${ws.id}`}
                   >
-                    <div className="font-medium text-sm">{ws.name}</div>
-                    <div className="text-xs text-neutral-500 mt-1">
-                      {new Date(ws.createdAt).toLocaleDateString()}
+                    <div className="flex items-center justify-between">
+                      <div className="text-left">
+                        <div className="font-medium text-sm">{ws.name}</div>
+                        <div className="text-xs text-neutral-500 mt-1">
+                          {new Date(ws.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      {user?.id === ws.ownerId && (
+                        <button
+                          onClick={(e) => handleDeleteWorkspace(e, ws.id)}
+                          className="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200"
+                          title="Delete workspace"
+                        >
+                          <HiOutlineTrash className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </button>
                 ))}

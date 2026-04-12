@@ -98,8 +98,14 @@ export async function applyMutation(params: ApplyMutationParams): Promise<ApplyM
     const changedFieldsSinceBase = new Set<string>();
     for (const row of deltaRes.rows) {
       const patch = row.patch as Record<string, unknown>;
-      for (const field of Object.keys(patch)) {
-        changedFieldsSinceBase.add(field);
+      for (const [field, value] of Object.entries(patch)) {
+        if (field === 'items' && typeof value === 'object' && value !== null) {
+          for (const itemKey of Object.keys(value as Record<string, unknown>)) {
+            changedFieldsSinceBase.add(`items.${itemKey}`);
+          }
+        } else {
+          changedFieldsSinceBase.add(field);
+        }
       }
     }
 
@@ -111,14 +117,38 @@ export async function applyMutation(params: ApplyMutationParams): Promise<ApplyM
     const cleanPatch: Record<string, unknown> = {};
 
     for (const [field, value] of Object.entries(params.patch)) {
-      if (changedFieldsSinceBase.has(field)) {
-        // Conflict: server wins
-        conflictingFields.push(field);
-        clientConflictValues[field] = value;
-        serverConflictValues[field] = currentContent[field];
-        resolvedConflictValues[field] = currentContent[field]; // server value preserved
+      if (field === 'items' && typeof value === 'object' && value !== null) {
+        const cleanItems: Record<string, unknown> = {};
+        const clientItemsValue = value as Record<string, unknown>;
+        let hasConflict = false;
+        
+        for (const [itemKey, itemValue] of Object.entries(clientItemsValue)) {
+          const path = `items.${itemKey}`;
+          if (changedFieldsSinceBase.has(path)) {
+            conflictingFields.push(path);
+            hasConflict = true;
+            // Provide a partial view of the conflict for this specific item
+            clientConflictValues[path] = itemValue;
+            const currentItems = currentContent.items as Record<string, unknown> | undefined;
+            serverConflictValues[path] = currentItems?.[itemKey];
+            resolvedConflictValues[path] = currentItems?.[itemKey];
+          } else {
+            cleanItems[itemKey] = itemValue;
+          }
+        }
+        
+        if (Object.keys(cleanItems).length > 0) {
+          cleanPatch.items = cleanItems;
+        }
       } else {
-        cleanPatch[field] = value;
+        if (changedFieldsSinceBase.has(field)) {
+          conflictingFields.push(field);
+          clientConflictValues[field] = value;
+          serverConflictValues[field] = currentContent[field];
+          resolvedConflictValues[field] = currentContent[field];
+        } else {
+          cleanPatch[field] = value;
+        }
       }
     }
 
@@ -132,15 +162,36 @@ export async function applyMutation(params: ApplyMutationParams): Promise<ApplyM
           }
         : null;
 
-    // 5. Build new content: current + clean patch
-    const newContent = { ...currentContent, ...cleanPatch };
+    // 5. Build new content: current + clean patch using deep merge
+    function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+      const result = { ...target };
+      for (const [key, value] of Object.entries(source)) {
+        if (key === 'items' && typeof value === 'object' && !Array.isArray(value) && value !== null) {
+      const itemsResult = { ...(result.items as Record<string, unknown> || {}) };
+      for (const [itemKey, itemValue] of Object.entries(value)) {
+        if (itemValue === null) {
+          delete itemsResult[itemKey];
+        } else {
+          itemsResult[itemKey] = itemValue;
+        }
+      }
+      result.items = itemsResult;
+    } else {
+          result[key] = value;
+        }
+      }
+      return result;
+    }
+
+    const newContent = deepMerge(currentContent, cleanPatch);
     const newRevision = currentRevision + 1;
     const appliedPatch = { ...cleanPatch };
 
     // 6. Update document
+    const newTitle = typeof newContent.title === 'string' ? newContent.title : doc.title;
     await client.query(
-      `UPDATE documents SET content = $1, revision = $2, updated_at = now() WHERE id = $3`,
-      [JSON.stringify(newContent), newRevision, params.documentId]
+      `UPDATE documents SET content = $1, revision = $2, title = $3, updated_at = now() WHERE id = $4`,
+      [JSON.stringify(newContent), newRevision, newTitle, params.documentId]
     );
 
     // 7. Store mutation record (idempotency: unique constraint on correlation_id)

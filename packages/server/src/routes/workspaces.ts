@@ -11,6 +11,7 @@ import {
   findUserByEmail,
   writeAuditLog,
   findAuditLogs,
+  deleteWorkspace,
 } from '../db/queries';
 import { logger } from '../utils/logger';
 
@@ -63,6 +64,23 @@ router.get('/:workspaceId', async (req, res) => {
     return;
   }
   res.json({ ok: true, data: workspace });
+});
+
+// Delete workspace
+router.delete('/:workspaceId', async (req, res) => {
+  const { workspaceId } = req.params;
+  const member = await findWorkspaceMember(workspaceId, req.user!.userId);
+  if (!member || member.role !== 'owner') {
+    res.status(403).json({ ok: false, error: 'Only owners can delete workspaces' });
+    return;
+  }
+  try {
+    await deleteWorkspace(workspaceId);
+    res.json({ ok: true, data: { success: true } });
+  } catch (err) {
+    logger.error('Delete workspace error', { error: (err as Error).message });
+    res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
 });
 
 // List members

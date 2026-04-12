@@ -66,6 +66,12 @@ export async function createWorkspace(name: string) {
   );
 }
 
+export async function deleteWorkspace(workspaceId: string) {
+  return request<{ success: boolean }>(`/workspaces/${workspaceId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function getWorkspaceMembers(workspaceId: string) {
   return request<Array<{
     workspaceId: string;

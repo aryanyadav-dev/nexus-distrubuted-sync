@@ -96,7 +96,15 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
   const result = { ...target };
   for (const [key, value] of Object.entries(source)) {
     if (key === 'items' && typeof value === 'object' && !Array.isArray(value) && value !== null) {
-      result.items = { ...(result.items as Record<string, unknown> || {}), ...(value as Record<string, unknown>) };
+      const itemsResult = { ...(result.items as Record<string, unknown> || {}) };
+      for (const [itemKey, itemValue] of Object.entries(value)) {
+        if (itemValue === null) {
+          delete itemsResult[itemKey];
+        } else {
+          itemsResult[itemKey] = itemValue;
+        }
+      }
+      result.items = itemsResult;
     } else {
       result[key] = value;
     }

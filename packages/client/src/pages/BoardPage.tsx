@@ -63,6 +63,39 @@ export default function BoardPage() {
   const [noteItemId, setNoteItemId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
 
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  const chatMessages = React.useMemo(() => {
+    if (!content) return [];
+    return Object.keys(content)
+      .filter((k) => k.startsWith('chat_'))
+      .map((k) => content[k] as { id: string; sender: string; text: string; ts: number })
+      .sort((a, b) => a.ts - b.ts);
+  }, [content]);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isChatOpen]);
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !user) return;
+    const msgId = `chat_${Date.now()}_${user.id}`;
+    sendPatch({
+      [msgId]: {
+        id: msgId,
+        sender: user.displayName,
+        text: chatInput.trim(),
+        ts: Date.now(),
+      }
+    });
+    setChatInput('');
+  };
+
   useEffect(() => {
     if (!token || !documentId) return;
 
@@ -163,9 +196,7 @@ export default function BoardPage() {
   };
 
   const handleDeleteItem = (itemId: string) => {
-    const items = { ...content?.items };
-    delete items[itemId];
-    sendPatch({ items });
+    sendPatch({ items: { [itemId]: null } });
   };
 
   const handleSaveEdit = (itemId: string) => {
@@ -241,6 +272,17 @@ export default function BoardPage() {
                 </div>
               ))}
             </div>
+
+            <button
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 font-medium ${
+                isChatOpen
+                  ? 'bg-white/10 border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                  : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/20'
+              }`}
+            >
+              <HiOutlineChatBubbleLeftRight className="w-3.5 h-3.5" /> Chat
+            </button>
 
             <button
               onClick={() => setShowDebug(!showDebug)}
@@ -427,6 +469,49 @@ export default function BoardPage() {
               <div>Rev: {revision}</div>
               <div>Peers: {presence.filter(p => p.isActive).length}</div>
               <div>Status: {connectionStatus}</div>
+            </div>
+          </aside>
+        )}
+
+        {/* Chat Sidebar */}
+        {isChatOpen && (
+          <aside className="w-80 border-l border-white/10 bg-black/60 flex flex-col glass-panel backdrop-blur-3xl z-10">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <HiOutlineChatBubbleLeftRight className="w-4 h-4 text-indigo-400" /> Real-time Chat
+              </h3>
+              <button onClick={() => setIsChatOpen(false)} className="text-neutral-500 hover:text-white transition-colors p-1 rounded-md hover:bg-white/5">
+                <HiOutlineXMark className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
+              {chatMessages.length === 0 ? (
+                <div className="text-xs text-neutral-500 text-center mt-10">No messages yet.</div>
+              ) : (
+                chatMessages.map(msg => (
+                  <div key={msg.id} className={`flex flex-col ${msg.sender === user?.displayName ? 'items-end' : 'items-start'}`}>
+                    <span className="text-[10px] text-neutral-500 mb-0.5 px-1">{msg.sender}</span>
+                    <div className={`px-3 py-2 rounded-2xl text-sm max-w-[85%] shadow-sm ${msg.sender === user?.displayName ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-neutral-200 rounded-bl-none'}`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={chatMessagesEndRef} />
+            </div>
+            <div className="p-3 border-t border-white/10 bg-white/[0.02]">
+              <form onSubmit={handleSendChat} className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                />
+                <button type="submit" disabled={!chatInput.trim()} className="bg-indigo-500 flex-shrink-0 hover:bg-indigo-400 disabled:bg-neutral-800 disabled:text-neutral-600 text-white p-2 rounded-xl transition-colors">
+                  <HiOutlineChatBubbleLeftRight className="w-4 h-4" />
+                </button>
+              </form>
             </div>
           </aside>
         )}

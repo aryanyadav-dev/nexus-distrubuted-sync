@@ -134,6 +134,10 @@ export async function findWorkspacesByUser(userId: string): Promise<Workspace[]>
   return res.rows.map(mapWorkspace);
 }
 
+export async function deleteWorkspace(id: string): Promise<void> {
+  await pool.query(`DELETE FROM workspaces WHERE id = $1`, [id]);
+}
+
 export async function findWorkspaceMember(
   workspaceId: string,
   userId: string
@@ -258,11 +262,12 @@ export async function applyPatchToDocument(
       newContent[key] = value;
     }
     const newRevision = currentDoc.revision + 1;
+    const newTitle = typeof newContent.title === 'string' ? newContent.title : currentDoc.title;
 
     const updateRes = await client.query(
-      `UPDATE documents SET content = $1, revision = $2, updated_at = now()
-       WHERE id = $3 RETURNING *`,
-      [JSON.stringify(newContent), newRevision, documentId]
+      `UPDATE documents SET content = $1, revision = $2, title = $3, updated_at = now()
+       WHERE id = $4 RETURNING *`,
+      [JSON.stringify(newContent), newRevision, newTitle, documentId]
     );
     await client.query('COMMIT');
     return mapDocument(updateRes.rows[0]);
