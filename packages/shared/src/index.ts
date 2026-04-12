@@ -293,6 +293,9 @@ export const ChecklistItemSchema = z.object({
   createdAt: z.string().datetime(),
   order: z.number().int().nonnegative(),
   note: z.string().optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  assigneeId: z.string().uuid().optional(),
+  dueDate: z.string().datetime().optional(),
 });
 export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
 

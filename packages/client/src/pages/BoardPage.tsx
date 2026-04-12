@@ -16,8 +16,10 @@ import {
 } from 'react-icons/hi2';
 import { useAuthStore } from '../stores/authStore';
 import { useSyncStore, type SyncLogEntry, type LogLevel } from '../stores/syncStore';
+import { getDocument, getWorkspaceMembers } from '../lib/api';
 import { SyncClient, type SyncEvent } from '../lib/SyncClient';
 import type { ChecklistContent, ChecklistItem, Presence, ConflictMeta } from '@dsync/shared';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
@@ -62,6 +64,8 @@ export default function BoardPage() {
   const [editingText, setEditingText] = useState('');
   const [noteItemId, setNoteItemId] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
+  const [selectedDetailsId, setSelectedDetailsId] = useState<string | null>(null);
+  const [workspaceMembers, setWorkspaceMembers] = useState<Array<{ userId: string; displayName: string }>>([]);
 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -105,6 +109,14 @@ export default function BoardPage() {
 
   useEffect(() => {
     if (!token || !documentId) return;
+
+    if (workspaceId) {
+      getWorkspaceMembers(workspaceId).then(res => {
+        if (res.ok) {
+          setWorkspaceMembers(res.data.map(m => ({ userId: m.userId, displayName: m.user?.displayName || 'Unknown' })));
+        }
+      });
+    }
 
     const client = new SyncClient({ url: WS_URL, token });
     clientRef.current = client;
@@ -378,26 +390,38 @@ export default function BoardPage() {
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto pr-2 pb-10">
-                {todoItems.map((item) => (
-                  <KanbanCard
-                    key={item.id}
-                    item={item}
-                    isEditing={editingItemId === item.id}
-                    editingText={editingText}
-                    isNoteEditing={noteItemId === item.id}
-                    noteText={noteText}
-                    onToggle={() => handleToggleItem(item.id)}
-                    onDelete={() => handleDeleteItem(item.id)}
-                    onStartEdit={() => { setEditingItemId(item.id); setEditingText(item.text); }}
-                    onCancelEdit={() => setEditingItemId(null)}
-                    onEditingTextChange={setEditingText}
-                    onSaveEdit={() => handleSaveEdit(item.id)}
-                    onStartNote={() => { setNoteItemId(item.id); setNoteText(item.note || ''); }}
-                    onCancelNote={() => setNoteItemId(null)}
-                    onNoteTextChange={setNoteText}
-                    onSaveNote={() => handleSaveNote(item.id)}
-                  />
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {todoItems.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    >
+                      <KanbanCard
+                        item={item}
+                        members={workspaceMembers}
+                        isEditing={editingItemId === item.id}
+                        editingText={editingText}
+                        isNoteEditing={noteItemId === item.id}
+                        noteText={noteText}
+                        onToggle={() => handleToggleItem(item.id)}
+                        onDelete={() => handleDeleteItem(item.id)}
+                        onOpenDetails={() => setSelectedDetailsId(item.id)}
+                        onStartEdit={() => { setEditingItemId(item.id); setEditingText(item.text); }}
+                        onCancelEdit={() => setEditingItemId(null)}
+                        onEditingTextChange={setEditingText}
+                        onSaveEdit={() => handleSaveEdit(item.id)}
+                        onStartNote={() => { setNoteItemId(item.id); setNoteText(item.note || ''); }}
+                        onCancelNote={() => setNoteItemId(null)}
+                        onNoteTextChange={setNoteText}
+                        onSaveNote={() => handleSaveNote(item.id)}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
                 {todoItems.length === 0 && content && (
                   <div className="text-center py-8 text-neutral-700 text-sm">
                     No items yet
@@ -416,26 +440,38 @@ export default function BoardPage() {
               </div>
 
               <div className="flex-1 space-y-3 overflow-y-auto pr-2 pb-10">
-                {doneItems.map((item) => (
-                  <KanbanCard
-                    key={item.id}
-                    item={item}
-                    isEditing={editingItemId === item.id}
-                    editingText={editingText}
-                    isNoteEditing={noteItemId === item.id}
-                    noteText={noteText}
-                    onToggle={() => handleToggleItem(item.id)}
-                    onDelete={() => handleDeleteItem(item.id)}
-                    onStartEdit={() => { setEditingItemId(item.id); setEditingText(item.text); }}
-                    onCancelEdit={() => setEditingItemId(null)}
-                    onEditingTextChange={setEditingText}
-                    onSaveEdit={() => handleSaveEdit(item.id)}
-                    onStartNote={() => { setNoteItemId(item.id); setNoteText(item.note || ''); }}
-                    onCancelNote={() => setNoteItemId(null)}
-                    onNoteTextChange={setNoteText}
-                    onSaveNote={() => handleSaveNote(item.id)}
-                  />
-                ))}
+                <AnimatePresence mode="popLayout">
+                  {doneItems.map((item) => (
+                    <motion.div
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    >
+                      <KanbanCard
+                        item={item}
+                        members={workspaceMembers}
+                        isEditing={editingItemId === item.id}
+                        editingText={editingText}
+                        isNoteEditing={noteItemId === item.id}
+                        noteText={noteText}
+                        onToggle={() => handleToggleItem(item.id)}
+                        onDelete={() => handleDeleteItem(item.id)}
+                        onOpenDetails={() => setSelectedDetailsId(item.id)}
+                        onStartEdit={() => { setEditingItemId(item.id); setEditingText(item.text); }}
+                        onCancelEdit={() => setEditingItemId(null)}
+                        onEditingTextChange={setEditingText}
+                        onSaveEdit={() => handleSaveEdit(item.id)}
+                        onStartNote={() => { setNoteItemId(item.id); setNoteText(item.note || ''); }}
+                        onCancelNote={() => setNoteItemId(null)}
+                        onNoteTextChange={setNoteText}
+                        onSaveNote={() => handleSaveNote(item.id)}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
                 {doneItems.length === 0 && (
                   <div className="text-center py-8 text-neutral-700 text-sm">
                     Completed items appear here
@@ -462,6 +498,31 @@ export default function BoardPage() {
             </div>
           )}
         </main>
+
+        <AnimatePresence>
+          {selectedDetailsId && content?.items?.[selectedDetailsId] && (
+            <TaskDetailsModal
+              item={content.items[selectedDetailsId] as ChecklistItem}
+              members={workspaceMembers}
+              onClose={() => setSelectedDetailsId(null)}
+              onUpdatePriority={(priority) => {
+                const dId = selectedDetailsId;
+                const current = content.items?.[dId] as ChecklistItem;
+                if (current) sendPatch({ items: { [dId]: { ...current, priority } } });
+              }}
+              onUpdateAssignee={(assigneeId) => {
+                const dId = selectedDetailsId;
+                const current = content.items?.[dId] as ChecklistItem;
+                if (current) sendPatch({ items: { [dId]: { ...current, assigneeId } } });
+              }}
+              onUpdateDueDate={(dueDate) => {
+                const dId = selectedDetailsId;
+                const current = content.items?.[dId] as ChecklistItem;
+                if (current) sendPatch({ items: { [dId]: { ...current, dueDate } } });
+              }}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Debug panel */}
         {showDebug && (
@@ -589,14 +650,113 @@ function EditableText({ value, onSave, className, placeholder }: {
   );
 }
 
-function KanbanCard({ item, isEditing, editingText, isNoteEditing, noteText, onToggle, onDelete, onStartEdit, onCancelEdit, onEditingTextChange, onSaveEdit, onStartNote, onCancelNote, onNoteTextChange, onSaveNote }: {
+function TaskDetailsModal({
+  item,
+  members,
+  onClose,
+  onUpdatePriority,
+  onUpdateAssignee,
+  onUpdateDueDate
+}: {
   item: ChecklistItem;
+  members: Array<{ userId: string; displayName: string }>;
+  onClose: () => void;
+  onUpdatePriority: (p: 'low' | 'medium' | 'high' | undefined) => void;
+  onUpdateAssignee: (id: string | undefined) => void;
+  onUpdateDueDate: (date: string | undefined) => void;
+}) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+    >
+      <motion.div 
+        initial={{ scale: 0.95, y: 10, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.95, y: 10, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="bg-white/[0.05] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl glass-panel relative flex flex-col gap-6"
+      >
+        <button onClick={onClose} className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors">
+          <HiOutlineXMark className="w-5 h-5" />
+        </button>
+        
+        <div className="space-y-1 pr-6">
+          <h2 className="text-xl font-semibold text-white">{item.text}</h2>
+          <p className="text-xs text-neutral-400">Created by {item.createdBy}</p>
+        </div>
+
+        <div className="space-y-4">
+          {/* Priority */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Priority</label>
+            <div className="flex gap-2">
+              {(['low', 'medium', 'high'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => onUpdatePriority(item.priority === p ? undefined : p)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    item.priority === p 
+                      ? p === 'high' ? 'bg-red-500/20 text-red-400 border border-red-500/50' 
+                      : p === 'medium' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
+                      : 'bg-white/[0.03] text-neutral-400 border border-white/10 hover:bg-white/10'
+                  }`}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Assignee */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Assignee</label>
+            <select
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50 appearance-none"
+              value={item.assigneeId || ''}
+              onChange={(e) => onUpdateAssignee(e.target.value || undefined)}
+            >
+              <option value="">Unassigned</option>
+              {members.map(m => (
+                <option key={m.userId} value={m.userId}>{m.displayName}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Due Date */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Due Date</label>
+            <input
+              type="date"
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-indigo-500/50 appearance-none [color-scheme:dark]"
+              value={item.dueDate ? item.dueDate.split('T')[0] : ''}
+              onChange={(e) => onUpdateDueDate(e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+            />
+          </div>
+        </div>
+
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function KanbanCard({
+  item, members, isEditing, editingText, isNoteEditing, noteText,
+  onToggle, onDelete, onOpenDetails, onStartEdit, onCancelEdit, onEditingTextChange,
+  onSaveEdit, onStartNote, onCancelNote, onNoteTextChange, onSaveNote
+}: {
+  item: ChecklistItem;
+  members: Array<{ userId: string; displayName: string }>;
   isEditing: boolean;
   editingText: string;
   isNoteEditing: boolean;
   noteText: string;
   onToggle: () => void;
   onDelete: () => void;
+  onOpenDetails: () => void;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onEditingTextChange: (v: string) => void;
@@ -606,6 +766,8 @@ function KanbanCard({ item, isEditing, editingText, isNoteEditing, noteText, onT
   onNoteTextChange: (v: string) => void;
   onSaveNote: () => void;
 }) {
+  const assigneeName = members.find(m => m.userId === item.assigneeId)?.displayName;
+
   return (
     <div className={`group relative glass-panel border border-white/5 rounded-2xl p-4 transition-all duration-300 hover:border-indigo-500/50 hover:shadow-[0_8px_30px_rgba(99,102,241,0.15)] ${item.completed ? 'bg-black/20 opacity-60' : 'bg-white/[0.02]'}`}>
       <div className="flex items-start gap-3">
@@ -621,7 +783,7 @@ function KanbanCard({ item, isEditing, editingText, isNoteEditing, noteText, onT
           {item.completed && <HiCheck className="w-3.5 h-3.5 stroke-[3]" />}
         </button>
 
-        {/* Text */}
+        {/* Text and Badges */}
         <div className="flex-1 min-w-0">
           {isEditing ? (
             <input
@@ -646,15 +808,38 @@ function KanbanCard({ item, isEditing, editingText, isNoteEditing, noteText, onT
             <span>{item.createdBy}</span>
             <span>{new Date(item.createdAt).toLocaleDateString()}</span>
           </div>
+          
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            {item.priority && (
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wider uppercase border ${
+                item.priority === 'high' ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                : item.priority === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+              }`}>
+                {item.priority}
+              </span>
+            )}
+            {assigneeName && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full bg-indigo-500/30 text-[8px] flex items-center justify-center text-white">{assigneeName.charAt(0).toUpperCase()}</span>
+                {assigneeName}
+              </span>
+            )}
+            {item.dueDate && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] bg-white/5 text-neutral-400 border border-white/10 flex items-center gap-1 font-medium">
+                Due {new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={onOpenDetails} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Edit Details">
+            <HiOutlinePencil className="w-3.5 h-3.5" />
+          </button>
           <button onClick={onStartNote} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Note">
             <HiOutlineChatBubbleLeftRight className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onStartEdit} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Edit">
-            <HiOutlinePencil className="w-3.5 h-3.5" />
           </button>
           <button onClick={onDelete} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Delete">
             <HiOutlineTrash className="w-3.5 h-3.5" />
