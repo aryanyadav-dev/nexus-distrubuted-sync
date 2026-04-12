@@ -21,8 +21,9 @@ interface SyncState {
   content: ChecklistContent | null;
   revision: number;
 
-  // Presence
+  // Presence & Typing
   presence: Presence[];
+  typing: Record<string, { userId: string, displayName: string, ts: number }[]>;
 
   // Debug log
   logs: SyncLogEntry[];
@@ -37,6 +38,8 @@ interface SyncState {
   applyRemotePatch: (patch: Record<string, unknown>, revision: number) => void;
   setFullContent: (content: ChecklistContent, revision: number) => void;
   setPresence: (p: Presence[]) => void;
+  setTyping: (userId: string, displayName: string, context: string) => void;
+  clearStaleTyping: () => void;
   addConflict: (correlationId: string, meta: ConflictMeta) => void;
   addLog: (level: LogLevel, message: string, meta?: Record<string, unknown>) => void;
   clearLogs: () => void;
@@ -49,6 +52,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   content: null,
   revision: 0,
   presence: [],
+  typing: {},
   logs: [],
   conflicts: [],
 
@@ -74,6 +78,31 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   setFullContent: (content, revision) => set({ content, revision }),
 
   setPresence: (presence) => set({ presence }),
+
+  setTyping: (userId, displayName, context) =>
+    set((state) => {
+      const currentContextTyping = state.typing[context] || [];
+      const others = currentContextTyping.filter((t) => t.userId !== userId);
+      return {
+        typing: {
+          ...state.typing,
+          [context]: [...others, { userId, displayName, ts: Date.now() }],
+        },
+      };
+    }),
+
+  clearStaleTyping: () =>
+    set((state) => {
+      const now = Date.now();
+      let changed = false;
+      const nextTyping: Record<string, { userId: string; displayName: string; ts: number }[]> = {};
+      for (const [ctx, users] of Object.entries(state.typing)) {
+        const active = users.filter((u) => now - u.ts < 3000); // 3-second timeout
+        if (active.length !== users.length) changed = true;
+        if (active.length > 0) nextTyping[ctx] = active;
+      }
+      return changed ? { typing: nextTyping } : state;
+    }),
 
   addConflict: (correlationId, meta) =>
     set((s) => ({

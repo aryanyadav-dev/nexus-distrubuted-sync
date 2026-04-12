@@ -96,6 +96,13 @@ export default function BoardPage() {
     setChatInput('');
   };
 
+  const handleChatTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setChatInput(e.target.value);
+    clientRef.current?.sendTyping(documentId!, 'chat');
+  };
+
+  const chatTyping = useSyncStore(s => s.typing['chat'] || []);
+
   useEffect(() => {
     if (!token || !documentId) return;
 
@@ -149,6 +156,9 @@ export default function BoardPage() {
           addConflict(event.message.correlationId, event.message.conflictMeta);
           addLog('conflict', `Conflict: ${event.message.conflictMeta.conflictingFields.join(', ')}`);
           break;
+        case 'typing_update':
+          useSyncStore.getState().setTyping(event.message.userId, event.message.displayName, event.message.context);
+          break;
         case 'error':
           addLog('error', `Error: ${event.message.message}`);
           break;
@@ -168,6 +178,13 @@ export default function BoardPage() {
       setConnectionStatus('disconnected');
     };
   }, [token, documentId]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      useSyncStore.getState().clearStaleTyping();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const sendPatch = useCallback((patch: Record<string, unknown>) => {
     clientRef.current?.mutate(documentId!, patch);
@@ -497,6 +514,11 @@ export default function BoardPage() {
                   </div>
                 ))
               )}
+              {chatTyping.length > 0 && (
+                <div className="flex bg-black/40 border border-white/5 rounded-2xl px-3 py-2 text-[10px] text-neutral-400 italic w-fit self-start animate-pulse">
+                  {chatTyping.map(t => t.displayName).join(', ')} {chatTyping.length === 1 ? 'is' : 'are'} typing...
+                </div>
+              )}
               <div ref={chatMessagesEndRef} />
             </div>
             <div className="p-3 border-t border-white/10 bg-white/[0.02]">
@@ -504,7 +526,7 @@ export default function BoardPage() {
                 <input
                   type="text"
                   value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
+                  onChange={handleChatTyping}
                   placeholder="Type a message..."
                   className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-neutral-500 outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
                 />

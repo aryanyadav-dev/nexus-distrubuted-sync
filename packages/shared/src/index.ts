@@ -132,6 +132,13 @@ export const UnsubscribeMessageSchema = z.object({
 });
 export type UnsubscribeMessage = z.infer<typeof UnsubscribeMessageSchema>;
 
+export const TypingMessageSchema = z.object({
+  type: z.literal('typing'),
+  documentId: z.string().uuid(),
+  context: z.string(), // "chat" or "task_UUID"
+});
+export type TypingMessage = z.infer<typeof TypingMessageSchema>;
+
 // Server → Client messages
 
 export const SnapshotMessageSchema = z.object({
@@ -172,6 +179,15 @@ export const PresenceUpdateSchema = z.object({
 });
 export type PresenceUpdate = z.infer<typeof PresenceUpdateSchema>;
 
+export const TypingUpdateSchema = z.object({
+  type: z.literal('typing_update'),
+  documentId: z.string().uuid(),
+  userId: z.string().uuid(),
+  displayName: z.string(),
+  context: z.string(), // "chat" or "task_UUID"
+});
+export type TypingUpdate = z.infer<typeof TypingUpdateSchema>;
+
 export const HeartbeatAckSchema = z.object({
   type: z.literal('heartbeat_ack'),
   ts: z.number(),
@@ -209,6 +225,7 @@ export const InboundMessageSchema = z.discriminatedUnion('type', [
   MutationMessageSchema,
   HeartbeatMessageSchema,
   UnsubscribeMessageSchema,
+  TypingMessageSchema,
 ]);
 export type InboundMessage = z.infer<typeof InboundMessageSchema>;
 
@@ -218,6 +235,7 @@ export type OutboundMessage =
   | MutationAck
   | RemoteUpdate
   | PresenceUpdate
+  | TypingUpdate
   | HeartbeatAck
   | ConflictMessage
   | ErrorMessage

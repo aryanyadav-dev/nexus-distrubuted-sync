@@ -37,6 +37,7 @@ export type SyncEvent =
   | { type: 'mutation_ack'; message: MutationAck }
   | { type: 'remote_update'; message: RemoteUpdate }
   | { type: 'presence_update'; message: PresenceUpdate }
+  | { type: 'typing_update'; message: import('@dsync/shared').TypingUpdate }
   | { type: 'conflict'; message: ConflictMessage }
   | { type: 'error'; message: ErrorMessage }
   | { type: 'heartbeat_ack'; message: HeartbeatAck }
@@ -166,6 +167,13 @@ export class SyncClient {
     return correlationId;
   }
 
+  /** Send a typing indicator state */
+  sendTyping(documentId: string, context: string): void {
+    if (this.isAuthenticated && !this.isSimulatingOffline) {
+      this.rawSend({ type: 'typing', documentId, context });
+    }
+  }
+
   /** Get current known revision for a document */
   getRevision(documentId: string): number {
     return this.documentRevisions.get(documentId) ?? 0;
@@ -279,6 +287,11 @@ export class SyncClient {
 
       case 'presence_update': {
         this.emit({ type: 'presence_update', message: msg });
+        break;
+      }
+
+      case 'typing_update': {
+        this.emit({ type: 'typing_update', message: msg });
         break;
       }
 

@@ -188,6 +188,24 @@ export async function handleConnection(ws: WebSocket, req: IncomingMessage): Pro
       return;
     }
 
+    // ── typing ─────────────────────────────────────────────────────────────
+    if (msg.type === 'typing') {
+      const { documentId, context } = msg;
+      const update: import('@dsync/shared').TypingUpdate = {
+        type: 'typing_update',
+        documentId,
+        userId: user.userId,
+        displayName: user.displayName,
+        context,
+      };
+      
+      // Broadcast to local sessions
+      broadcastToDocument(documentId, update, sessionId);
+      // Broadcast via Redis
+      await publishToDocument(documentId, { ...update, _sourceSessionId: sessionId });
+      return;
+    }
+
     // ── mutation ───────────────────────────────────────────────────────────
     if (msg.type === 'mutation') {
       const { correlationId, documentId, baseRevision, patch } = msg;
@@ -324,10 +342,10 @@ async function broadcastPresence(documentId: string): Promise<void> {
 // ─────────────────────────────────────────────
 redisSub.on('message', (channel: string, payload: string) => {
   try {
-    const msg = JSON.parse(payload) as RemoteUpdate & { _sourceSessionId?: string };
+    const msg = JSON.parse(payload) as (import('@dsync/shared').RemoteUpdate | import('@dsync/shared').TypingUpdate) & { _sourceSessionId?: string };
     const { _sourceSessionId, ...update } = msg;
 
-    if (update.type === 'remote_update') {
+    if (update.type === 'remote_update' || update.type === 'typing_update') {
       broadcastToDocument(update.documentId, update, _sourceSessionId);
     }
   } catch (err) {
