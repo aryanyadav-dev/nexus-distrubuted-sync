@@ -126,6 +126,51 @@ npx vite --port 3000
 - Server detects conflict → applies server-wins resolution
 - Check debug log for conflict metadata
 
+## Docs Module Updates
+
+This project now includes a dedicated collaborative docs flow in addition to the board experience.
+
+### What We Added
+
+- **New doc module and routing**
+  - Added a separate collaborative docs experience
+  - Workspace document selection now opens either a board or a doc
+  - Workspaces can now contain both `Board` and `Doc` documents
+
+- **Collaborative doc editing**
+  - Rich doc-style page with editable title and body
+  - Real-time collaborative editing
+  - Typing indicators for title and body
+  - Autosave support while editing
+
+- **Live presence for docs**
+  - Dedicated Live Presence card on docs
+  - Shows only currently active workspace members
+  - Displays each active member’s role
+  - Updated the icon styling to match the purple app theme
+
+- **Share link section**
+  - Added a copyable share-link card on the doc page
+  - Lets users quickly copy the direct doc link
+
+- **Doc tasks**
+  - Added a task section inside docs
+  - Tasks can be assigned to workspace members
+  - Tasks are linked directly to a selected board instead of using a due date field
+  - Each task can open its exact linked board directly from the doc UI
+  - Tasks can be deleted directly from the doc UI
+  - When a task is added from the doc, it is also added into the selected board
+  - When that linked board task is completed or removed, it disappears from the doc task list automatically
+
+- **Board-linked workflow**
+  - Tasks created from docs now flow directly into the selected board
+  - The doc task list acts as a lightweight linked task surface for board work
+
+- **Doc sidebar cleanup**
+  - Removed the comments section from the docs sidebar
+  - Removed the activity/versions section from the docs sidebar
+  - Replaced them with cleaner task and share-link surfaces
+
 ## WebSocket Protocol
 
 | Message | Direction | Purpose |
@@ -159,7 +204,10 @@ npx vite --port 3000
 | `/api/workspaces/:wsId/documents` | GET | List documents |
 | `/api/workspaces/:wsId/documents` | POST | Create document |
 | `/api/workspaces/:wsId/documents/:docId` | GET | Get document |
+| `/api/workspaces/:wsId/documents/:docId` | PATCH | Update document with a patch |
+| `/api/workspaces/:wsId/documents/:docId` | DELETE | Delete document |
 | `/api/workspaces/:wsId/documents/:docId/history` | GET | Mutation history |
+| `/api/workspaces/:wsId/documents/:docId/restore/:revision` | GET | Restore document at a revision |
 | `/api/workspaces/:wsId/documents/:docId/snapshot` | GET | Latest snapshot |
 | `/api/admin/sessions` | GET | Live sessions |
 | `/api/admin/health` | GET | Server health/metrics |

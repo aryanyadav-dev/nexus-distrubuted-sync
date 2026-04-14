@@ -281,6 +281,11 @@ export const CreateDocumentRequestSchema = z.object({
 });
 export type CreateDocumentRequest = z.infer<typeof CreateDocumentRequestSchema>;
 
+export const UpdateDocumentRequestSchema = z.object({
+  patch: PatchSchema,
+});
+export type UpdateDocumentRequest = z.infer<typeof UpdateDocumentRequestSchema>;
+
 // ─────────────────────────────────────────────
 // Checklist demo types (concrete content model)
 // ─────────────────────────────────────────────

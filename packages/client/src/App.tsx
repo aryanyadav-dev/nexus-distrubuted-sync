@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
 import WorkspacePage from './pages/WorkspacePage';
 import BoardPage from './pages/BoardPage';
+import DocsPage from './pages/DocsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -14,7 +15,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const hydrate = useAuthStore((s) => s.hydrate);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -32,37 +32,54 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route
-          path="/"
-          element={isAuthenticated ? <Navigate to="/workspaces" replace /> : <LandingPage />}
-        />
-        <Route
-          path="/login"
-          element={isAuthenticated ? <Navigate to="/workspaces" replace /> : <AuthPage />}
-        />
-        <Route
-          path="/workspaces"
-          element={
-            <ProtectedRoute>
-              <WorkspacePage
-                onSelectDocument={(wsId, docId) => {
-                  window.location.href = `/board/${wsId}/${docId}`;
-                }}
-              />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/board/:workspaceId/:documentId"
-          element={
-            <ProtectedRoute>
-              <BoardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
+  );
+}
+
+function AppRoutes() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const navigate = useNavigate();
+
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/workspaces" replace /> : <LandingPage />}
+      />
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/workspaces" replace /> : <AuthPage />}
+      />
+      <Route
+        path="/workspaces"
+        element={
+          <ProtectedRoute>
+            <WorkspacePage
+              onSelectDocument={(wsId, docId, kind) => {
+                navigate(kind === 'doc' ? `/docs/${wsId}/${docId}` : `/board/${wsId}/${docId}`);
+              }}
+            />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/docs/:workspaceId/:documentId"
+        element={
+          <ProtectedRoute>
+            <DocsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/board/:workspaceId/:documentId"
+        element={
+          <ProtectedRoute>
+            <BoardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

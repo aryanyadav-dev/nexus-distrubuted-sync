@@ -27,6 +27,13 @@ const AVATAR_SHADES = [
   '#444', '#555', '#666', '#777', '#888',
 ];
 
+type ChatMessage = {
+  id: string;
+  sender: string;
+  text: string;
+  ts: number;
+};
+
 function getAvatarShade(userId: string) {
   let hash = 0;
   for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
@@ -73,9 +80,18 @@ export default function BoardPage() {
 
   const chatMessages = React.useMemo(() => {
     if (!content) return [];
-    return Object.keys(content)
+    const rawContent = content as Record<string, unknown>;
+    return Object.keys(rawContent)
       .filter((k) => k.startsWith('chat_'))
-      .map((k) => content[k] as { id: string; sender: string; text: string; ts: number })
+      .map((k) => rawContent[k])
+      .filter((message): message is ChatMessage => {
+        return !!message
+          && typeof message === 'object'
+          && typeof (message as ChatMessage).id === 'string'
+          && typeof (message as ChatMessage).sender === 'string'
+          && typeof (message as ChatMessage).text === 'string'
+          && typeof (message as ChatMessage).ts === 'number';
+      })
       .sort((a, b) => a.ts - b.ts);
   }, [content]);
 

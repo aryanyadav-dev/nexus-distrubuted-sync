@@ -1,5 +1,5 @@
 import { Router, type Request } from 'express';
-import { CreateDocumentRequestSchema } from '@dsync/shared';
+import { CreateDocumentRequestSchema, UpdateDocumentRequestSchema, type RemoteUpdate } from '@dsync/shared';
 import { requireAuth } from '../auth/jwt';
 import {
   createDocument,
@@ -11,9 +11,14 @@ import {
   findSnapshotByRevision,
   writeAuditLog,
   deleteDocument,
+  applyPatchToDocument,
+  storeMutation,
 } from '../db/queries';
 import { restoreAtRevision, estimateReplayCost } from '../sync/snapshotRestore';
 import { logger } from '../utils/logger';
+import { broadcastToDocument } from '../ws/sessionRegistry';
+import { publishToDocument } from '../redis/client';
+import { syncResolvedBoardTasks } from '../sync/linkedBoardTasks';
 
 interface DocParams {
   workspaceId: string;
@@ -88,6 +93,58 @@ router.get('/:docId', async (req: Request<DocParams>, res) => {
     return;
   }
   res.json({ ok: true, data: access.doc });
+});
+
+router.patch('/:docId', async (req: Request<DocParams>, res) => {
+  const access = await assertDocumentAccess(req.params.docId!, req.user!.userId);
+  if (!access || access.member.role === 'viewer') {
+    res.status(403).json({ ok: false, error: 'Forbidden' });
+    return;
+  }
+
+  const parsed = UpdateDocumentRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ ok: false, error: 'Invalid request', details: parsed.error.flatten() });
+    return;
+  }
+
+  try {
+    const updated = await applyPatchToDocument(req.params.docId!, parsed.data.patch, access.doc.revision);
+    await storeMutation({
+      documentId: updated.id,
+      userId: req.user!.userId,
+      revision: updated.revision,
+      baseRevision: access.doc.revision,
+      patch: parsed.data.patch,
+      conflictMeta: null,
+      correlationId: crypto.randomUUID(),
+    });
+
+    const remoteUpdate: RemoteUpdate = {
+      type: 'remote_update',
+      documentId: updated.id,
+      revision: updated.revision,
+      patch: parsed.data.patch,
+      userId: req.user!.userId,
+      displayName: req.user!.displayName,
+      correlationId: crypto.randomUUID(),
+      conflictMeta: null,
+    };
+    broadcastToDocument(updated.id, remoteUpdate);
+    await publishToDocument(updated.id, remoteUpdate);
+    await syncResolvedBoardTasks({
+      workspaceId: updated.workspaceId,
+      boardId: updated.id,
+      patch: parsed.data.patch,
+      userId: req.user!.userId,
+      displayName: req.user!.displayName,
+    });
+
+    res.json({ ok: true, data: updated });
+  } catch (err) {
+    logger.error('Update document error', { error: (err as Error).message });
+    res.status(500).json({ ok: false, error: 'Internal server error' });
+  }
 });
 
 // Delete document

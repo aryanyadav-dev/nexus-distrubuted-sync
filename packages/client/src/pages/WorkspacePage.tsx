@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   HiOutlineArrowRightOnRectangle,
   HiOutlinePlus,
@@ -6,7 +7,15 @@ import {
   HiOutlineTrash,
 } from 'react-icons/hi2';
 import { useAuthStore } from '../stores/authStore';
-import { listWorkspaces, listDocuments, createWorkspace, createDocument, deleteDocument, deleteWorkspace } from '../lib/api';
+import {
+  listWorkspaces,
+  listDocuments,
+  createWorkspace,
+  createDocument,
+  deleteDocument,
+  deleteWorkspace,
+} from '../lib/api';
+import { createInitialDocumentContent, inferDocumentKind, type DocumentKind } from '../lib/documentTemplates';
 
 interface WorkspaceInfo {
   id: string;
@@ -17,16 +26,21 @@ interface WorkspaceInfo {
 
 interface DocumentInfo {
   id: string;
+  workspaceId: string;
   title: string;
+  content: Record<string, unknown>;
   revision: number;
+  createdAt: string;
   updatedAt: string;
 }
 
 interface Props {
-  onSelectDocument: (workspaceId: string, documentId: string) => void;
+  onSelectDocument: (workspaceId: string, documentId: string, kind: DocumentKind) => void;
 }
 
 export default function WorkspacePage({ onSelectDocument }: Props) {
+  const [searchParams] = useSearchParams();
+  const requestedWorkspaceId = searchParams.get('workspace');
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [workspaces, setWorkspaces] = useState<WorkspaceInfo[]>([]);
@@ -34,6 +48,7 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [newWsName, setNewWsName] = useState('');
   const [newDocTitle, setNewDocTitle] = useState('');
+  const [draftKind, setDraftKind] = useState<DocumentKind>('board');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,19 +59,31 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
     if (selectedWs) loadDocuments(selectedWs);
   }, [selectedWs]);
 
+  useEffect(() => {
+    if (!requestedWorkspaceId) return;
+    if (workspaces.some((ws) => ws.id === requestedWorkspaceId)) {
+      setSelectedWs(requestedWorkspaceId);
+    }
+  }, [requestedWorkspaceId, workspaces]);
+
   const loadWorkspaces = async () => {
     setLoading(true);
     const res = await listWorkspaces();
     if (res.ok) {
       setWorkspaces(res.data);
-      if (res.data.length > 0 && !selectedWs) setSelectedWs(res.data[0].id);
+      if (res.data.length > 0) {
+        const preferredWorkspace = requestedWorkspaceId && res.data.some((ws) => ws.id === requestedWorkspaceId)
+          ? requestedWorkspaceId
+          : res.data[0].id;
+        setSelectedWs((current) => current ?? preferredWorkspace);
+      }
     }
     setLoading(false);
   };
 
   const loadDocuments = async (wsId: string) => {
     const res = await listDocuments(wsId);
-    if (res.ok) setDocuments(res.data as any);
+    if (res.ok) setDocuments(res.data as DocumentInfo[]);
   };
 
   const handleCreateWorkspace = async () => {
@@ -70,11 +97,7 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
 
   const handleCreateDocument = async () => {
     if (!newDocTitle.trim() || !selectedWs) return;
-    const initial = {
-      title: newDocTitle.trim(),
-      description: '',
-      items: {},
-    };
+    const initial = createInitialDocumentContent(draftKind, newDocTitle.trim());
     const res = await createDocument(selectedWs, newDocTitle.trim(), initial);
     if (res.ok) {
       setNewDocTitle('');
@@ -103,9 +126,8 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
 
   return (
     <div className="min-h-screen bg-transparent text-white">
-      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-white/[0.02] backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <span className="font-semibold tracking-tight text-sm">Nexus</span>
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium text-neutral-400 flex items-center gap-2">
@@ -121,9 +143,8 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Workspaces Panel */}
           <div className="card p-6">
             <h2 className="text-sm font-medium text-white mb-6 flex items-center gap-2">
               Workspaces
@@ -173,7 +194,6 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
               </div>
             )}
 
-            {/* Create workspace */}
             <div className="mt-6 pt-6 border-t border-white/10">
               <div className="flex gap-2">
                 <input
@@ -191,7 +211,6 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
             </div>
           </div>
 
-          {/* Documents Panel */}
           <div className="card p-6 lg:col-span-2">
             <h2 className="text-sm font-medium text-white mb-6 flex items-center gap-2">
               Documents
@@ -210,7 +229,7 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
                   {documents.map((doc) => (
                     <button
                       key={doc.id}
-                      onClick={() => onSelectDocument(selectedWs, doc.id)}
+                      onClick={() => onSelectDocument(selectedWs, doc.id, inferDocumentKind(doc.content))}
                       className="text-left p-5 bg-white/[0.02] hover:bg-white/[0.06] rounded-xl border border-white/10 hover:border-indigo-500/50 transition-all duration-300 group shadow-sm hover:shadow-[0_4px_20px_rgba(99,102,241,0.15)] flex flex-col justify-between"
                       id={`doc-${doc.id}`}
                     >
@@ -221,6 +240,9 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
                           </div>
                           <div className="text-xs text-neutral-500 mt-1 flex items-center gap-2">
                             <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px]">Rev {doc.revision}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] uppercase">
+                              {inferDocumentKind(doc.content)}
+                            </span>
                             <span>{new Date(doc.updatedAt).toLocaleDateString()}</span>
                           </div>
                         </div>
@@ -246,10 +268,34 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
                 )}
 
                 <div className="mt-6 pt-6 border-t border-white/10">
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setDraftKind('board')}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                        draftKind === 'board'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white/[0.04] text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      Board
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDraftKind('doc')}
+                      className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                        draftKind === 'doc'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white/[0.04] text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      Doc
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <input
                       className="input text-xs py-2"
-                      placeholder="New document title"
+                      placeholder={draftKind === 'doc' ? 'New doc title' : 'New board title'}
                       value={newDocTitle}
                       onChange={(e) => setNewDocTitle(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleCreateDocument()}
@@ -260,6 +306,7 @@ export default function WorkspacePage({ onSelectDocument }: Props) {
                     </button>
                   </div>
                 </div>
+
               </>
             )}
           </div>

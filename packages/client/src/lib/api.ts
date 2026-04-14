@@ -132,6 +132,20 @@ export async function getDocument(workspaceId: string, docId: string) {
   }>(`/workspaces/${workspaceId}/documents/${docId}`);
 }
 
+export async function updateDocument(workspaceId: string, docId: string, patch: Record<string, unknown>) {
+  return request<{
+    id: string;
+    workspaceId: string;
+    title: string;
+    content: Record<string, unknown>;
+    revision: number;
+    updatedAt: string;
+  }>(`/workspaces/${workspaceId}/documents/${docId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ patch }),
+  });
+}
+
 export async function getDocumentHistory(workspaceId: string, docId: string, limit = 50) {
   return request<Array<{
     id: string;
@@ -144,6 +158,16 @@ export async function getDocumentHistory(workspaceId: string, docId: string, lim
     correlationId: string;
     appliedAt: string;
   }>>(`/workspaces/${workspaceId}/documents/${docId}/history?limit=${limit}`);
+}
+
+export async function restoreDocumentRevision(workspaceId: string, docId: string, revision: number) {
+  return request<{
+    id: string;
+    workspaceId: string;
+    title: string;
+    content: Record<string, unknown>;
+    revision: number;
+  }>(`/workspaces/${workspaceId}/documents/${docId}/restore/${revision}`);
 }
 
 // ── Admin ───────────────────────────────────────────────

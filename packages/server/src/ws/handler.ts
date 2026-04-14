@@ -37,6 +37,7 @@ import {
   documentChannel,
 } from '../redis/client';
 import { enqueueMutation } from '../sync/mutationQueue';
+import { syncResolvedBoardTasks } from '../sync/linkedBoardTasks';
 import {
   findDocumentById,
   findWorkspaceMember,
@@ -280,6 +281,13 @@ export async function handleConnection(ws: WebSocket, req: IncomingMessage): Pro
 
         // Broadcast via Redis for other server instances
         await publishToDocument(documentId, { ...remoteUpdate, _sourceSessionId: sessionId });
+        await syncResolvedBoardTasks({
+          workspaceId: doc.workspaceId,
+          boardId: documentId,
+          patch: result.appliedPatch,
+          userId: user.userId,
+          displayName: user.displayName,
+        });
 
         // Log audit
         await writeAuditLog({
