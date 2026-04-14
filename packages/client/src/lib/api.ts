@@ -169,19 +169,48 @@ async function requestWithFallback<T>(
 // ── Auth ────────────────────────────────────────────────────────
 
 export async function signUp(email: string, password: string, displayName: string) {
-  return requestWithFallback<{ token: string; user: { id: string; email: string; displayName: string } }>(
+  // Auth calls ALWAYS try the real backend first, even if we were in demo mode.
+  // This ensures that once the backend is available, users get real tokens.
+  const savedDemoMode = forceDemoMode;
+  forceDemoMode = false;
+
+  const result = await requestWithFallback<{ token: string; user: { id: string; email: string; displayName: string } }>(
     '/auth/signup',
     { method: 'POST', body: JSON.stringify({ email, password, displayName }) },
-    () => demoSignUp(email, password, displayName),
+    () => {
+      forceDemoMode = savedDemoMode; // restore if falling back
+      return demoSignUp(email, password, displayName);
+    },
   );
+
+  if (result.ok && !isDemoToken(result.data.token)) {
+    // Successfully authenticated with real backend — clear demo mode permanently
+    forceDemoMode = false;
+    console.log('[DSync] Authenticated with REAL backend — live sync enabled!');
+  }
+  return result;
 }
 
 export async function signIn(email: string, password: string) {
-  return requestWithFallback<{ token: string; user: { id: string; email: string; displayName: string } }>(
+  // Auth calls ALWAYS try the real backend first, even if we were in demo mode.
+  const savedDemoMode = forceDemoMode;
+  forceDemoMode = false;
+
+  const result = await requestWithFallback<{ token: string; user: { id: string; email: string; displayName: string } }>(
     '/auth/signin',
     { method: 'POST', body: JSON.stringify({ email, password }) },
-    () => demoSignIn(email, password),
+    () => {
+      forceDemoMode = savedDemoMode; // restore if falling back
+      return demoSignIn(email, password);
+    },
   );
+
+  if (result.ok && !isDemoToken(result.data.token)) {
+    // Successfully authenticated with real backend — clear demo mode permanently
+    forceDemoMode = false;
+    console.log('[DSync] Authenticated with REAL backend — live sync enabled!');
+  }
+  return result;
 }
 
 // ── Workspaces ──────────────────────────────────────────────────
