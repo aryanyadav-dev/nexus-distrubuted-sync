@@ -3,7 +3,7 @@
  * Handles auth, workspaces, documents, and history endpoints.
  */
 
-const BASE_URL = '/api';
+const BASE_URL = (((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_URL) || '/api').replace(/\/$/, '');
 
 function getToken(): string | null {
   return localStorage.getItem('dsync_token');
@@ -14,6 +14,7 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
   const token = getToken();
+  const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
@@ -21,13 +22,37 @@ async function request<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(url, {
       ...options,
       headers,
     });
-    const body = await res.json();
+
+    const contentType = res.headers.get('content-type') || '';
+    const rawBody = await res.text();
+
+    if (!contentType.includes('application/json')) {
+      const preview = rawBody.trim().slice(0, 140) || `HTTP ${res.status}`;
+      return {
+        ok: false,
+        error: `API returned non-JSON response (${res.status}) from ${url}: ${preview}`,
+      };
+    }
+
+    let body: { ok?: boolean; error?: string; data?: T };
+    try {
+      body = JSON.parse(rawBody) as { ok?: boolean; error?: string; data?: T };
+    } catch {
+      return {
+        ok: false,
+        error: `API returned invalid JSON (${res.status}) from ${url}`,
+      };
+    }
+
     if (!res.ok || body.ok === false) {
       return { ok: false, error: body.error || `HTTP ${res.status}` };
+    }
+    if (body.data === undefined) {
+      return { ok: false, error: `API response missing data from ${url}` };
     }
     return { ok: true, data: body.data };
   } catch (err) {
