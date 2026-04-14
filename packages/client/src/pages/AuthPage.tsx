@@ -128,14 +128,42 @@ export default function AuthPage() {
 
           {/* Demo hint */}
           <div className="mt-8 p-4 bg-black/20 rounded-xl border border-white/5 backdrop-blur-sm">
-            <p className="text-xs text-neutral-400 font-medium mb-2 flex items-center gap-2">
+            <p className="text-xs text-neutral-400 font-medium mb-3 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
-              Demo Accounts
+              Demo Accounts (One-Click Login)
             </p>
-            <div className="text-xs text-neutral-500 space-y-1.5 font-mono">
-              <div className="flex items-center justify-between"><span className="text-neutral-300">alice@demo.com</span> <span>password123</span></div>
-              <div className="flex items-center justify-between"><span className="text-neutral-300">bob@demo.com</span> <span>password123</span></div>
-              <div className="flex items-center justify-between"><span className="text-neutral-300">carol@demo.com</span> <span>password123</span></div>
+            <div className="flex flex-col gap-2">
+              {['alice@demo.com', 'bob@demo.com', 'carol@demo.com'].map((demoEmail) => (
+                <button
+                  key={demoEmail}
+                  type="button"
+                  disabled={loading}
+                  onClick={async () => {
+                    setIsSignUp(false);
+                    setEmail(demoEmail);
+                    setPassword('password123');
+                    setError('');
+                    setLoading(true);
+                    try {
+                      const result = await signIn(demoEmail, 'password123');
+                      if (!result.ok) {
+                        setError(result.error);
+                        return;
+                      }
+                      login(result.data.token, result.data.user);
+                    } catch (err) {
+                      setError((err as Error).message);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="flex items-center justify-between px-3 py-2 bg-white/[0.03] hover:bg-white/[0.08] border border-white/5 rounded-lg text-xs font-mono transition-colors disabled:opacity-50"
+                  id={`demo-login-${demoEmail.split('@')[0]}`}
+                >
+                  <span className="text-neutral-300">{demoEmail}</span>
+                  <span className="text-indigo-400 font-sans text-[10px] font-medium tracking-wide uppercase">Login ➝</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>

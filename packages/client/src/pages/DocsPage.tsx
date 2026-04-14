@@ -15,6 +15,7 @@ import {
   HiOutlineTrash,
 } from 'react-icons/hi2';
 import { SyncClient, type SyncEvent } from '../lib/SyncClient';
+import { createDemoSyncClientIfNeeded } from '../lib/DemoSyncClient';
 import { useAuthStore } from '../stores/authStore';
 import { getDocument, getWorkspaceMembers, listDocuments, updateDocument } from '../lib/api';
 import { inferDocumentKind } from '../lib/documentTemplates';
@@ -302,8 +303,9 @@ export default function DocsPage() {
       }
     });
 
-    const client = new SyncClient({ url: WS_URL, token });
-    clientRef.current = client;
+    const demoClient = createDemoSyncClientIfNeeded({ url: WS_URL, token });
+    const client = demoClient ?? new SyncClient({ url: WS_URL, token });
+    clientRef.current = client as SyncClient;
 
     const handler = (event: SyncEvent) => {
       switch (event.type) {

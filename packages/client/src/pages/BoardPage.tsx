@@ -16,8 +16,9 @@ import {
 } from 'react-icons/hi2';
 import { useAuthStore } from '../stores/authStore';
 import { useSyncStore, type SyncLogEntry, type LogLevel } from '../stores/syncStore';
-import { getDocument, getWorkspaceMembers } from '../lib/api';
+import { getDocument, getWorkspaceMembers, isInDemoMode } from '../lib/api';
 import { SyncClient, type SyncEvent } from '../lib/SyncClient';
+import { createDemoSyncClientIfNeeded } from '../lib/DemoSyncClient';
 import type { ChecklistContent, ChecklistItem, Presence, ConflictMeta } from '@dsync/shared';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getWsUrl } from '../lib/runtimeConfig';
@@ -135,8 +136,9 @@ export default function BoardPage() {
       });
     }
 
-    const client = new SyncClient({ url: WS_URL, token });
-    clientRef.current = client;
+    const demoClient = createDemoSyncClientIfNeeded({ url: WS_URL, token });
+    const client = demoClient ?? new SyncClient({ url: WS_URL, token });
+    clientRef.current = client as SyncClient;
 
     const handler = (event: SyncEvent) => {
       switch (event.type) {
