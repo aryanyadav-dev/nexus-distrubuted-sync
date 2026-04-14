@@ -1,11 +1,15 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 // Migration config for node-pg-migrate
-if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
-  throw new Error("CRITICAL ERROR: 'DATABASE_URL' is missing! Make sure you are running 'npm run migrate' in the Render 'Start Command' box, NOT the 'Build Command' box!");
+const dbUrl = process.env.DATABASE_URL;
+
+if (!dbUrl) {
+  console.error("CRITICAL ERROR: 'DATABASE_URL' environment variable is missing completely!");
+  console.error("Please verify that you placed 'DATABASE_URL' in the Render Environment Variables tab and spelled it correctly.");
+  throw new Error("Missing DATABASE_URL");
 }
 
 module.exports = {
-  databaseUrl: process.env.DATABASE_URL || 'postgres://dsync:dsync@localhost:5432/dsync',
+  databaseUrl: dbUrl,
   migrationsTable: 'pgmigrations',
   dir: `${__dirname}/../../migrations`,
   direction: 'up',
