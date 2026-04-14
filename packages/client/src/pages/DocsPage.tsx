@@ -18,8 +18,9 @@ import { SyncClient, type SyncEvent } from '../lib/SyncClient';
 import { useAuthStore } from '../stores/authStore';
 import { getDocument, getWorkspaceMembers, listDocuments, updateDocument } from '../lib/api';
 import { inferDocumentKind } from '../lib/documentTemplates';
+import { getWsUrl } from '../lib/runtimeConfig';
 
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+const WS_URL = getWsUrl();
 
 interface DocTask {
   id: string;

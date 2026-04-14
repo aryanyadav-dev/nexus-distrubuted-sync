@@ -3,7 +3,9 @@
  * Handles auth, workspaces, documents, and history endpoints.
  */
 
-const BASE_URL = (((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_URL) || '/api').replace(/\/$/, '');
+import { getApiBaseUrl } from './runtimeConfig';
+
+const BASE_URL = getApiBaseUrl();
 
 function getToken(): string | null {
   return localStorage.getItem('dsync_token');
@@ -32,9 +34,13 @@ async function request<T>(
 
     if (!contentType.includes('application/json')) {
       const preview = rawBody.trim().slice(0, 140) || `HTTP ${res.status}`;
+      const deploymentHint =
+        BASE_URL === '/api' && typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+          ? ' Check your production API routing or set VITE_API_URL to your deployed backend /api base.'
+          : '';
       return {
         ok: false,
-        error: `API returned non-JSON response (${res.status}) from ${url}: ${preview}`,
+        error: `API returned non-JSON response (${res.status}) from ${url}: ${preview}${deploymentHint}`,
       };
     }
 

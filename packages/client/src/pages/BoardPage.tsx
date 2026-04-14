@@ -20,8 +20,9 @@ import { getDocument, getWorkspaceMembers } from '../lib/api';
 import { SyncClient, type SyncEvent } from '../lib/SyncClient';
 import type { ChecklistContent, ChecklistItem, Presence, ConflictMeta } from '@dsync/shared';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getWsUrl } from '../lib/runtimeConfig';
 
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+const WS_URL = getWsUrl();
 
 const AVATAR_SHADES = [
   '#444', '#555', '#666', '#777', '#888',
