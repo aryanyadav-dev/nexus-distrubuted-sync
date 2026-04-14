@@ -30,6 +30,10 @@ export class DemoSyncClient {
   connect(): void {
     if (this.isConnected) return;
     this.isConnected = true;
+    
+    // Listen for storage events for cross-tab sync
+    window.addEventListener('storage', this.handleStorage);
+
     // Simulate async connection
     setTimeout(() => {
       this.emit({ type: 'connected' });
@@ -59,6 +63,7 @@ export class DemoSyncClient {
 
   disconnect(): void {
     this.isConnected = false;
+    window.removeEventListener('storage', this.handleStorage);
     if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.heartbeatTimer = null;
     this.emit({ type: 'disconnected', reason: 'Demo client disconnected' });
@@ -210,6 +215,38 @@ export class DemoSyncClient {
     if (!res.ok) return null;
     return res.data;
   }
+
+  private handleStorage = (e: StorageEvent) => {
+    if (e.key === 'dsync_demo_store' && this.subscribedDocId) {
+      // Local storage was updated by another tab!
+      try {
+        const storeRaw = e.newValue;
+        if (!storeRaw) return;
+        
+        const store = JSON.parse(storeRaw) as { documents: Record<string, any> };
+        const docEntry = store.documents[this.subscribedDocId];
+        
+        if (docEntry) {
+          // If the revision is newer than what we know, emit a snapshot
+          const currentRev = this.getRevision(this.subscribedDocId);
+          if (docEntry.revision > currentRev) {
+            this.revisionMap.set(this.subscribedDocId, docEntry.revision);
+            this.emit({
+              type: 'snapshot',
+              message: {
+                type: 'snapshot' as const,
+                documentId: this.subscribedDocId,
+                content: docEntry.content,
+                revision: docEntry.revision,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        // Ignore parse errors from other tabs
+      }
+    }
+  };
 
   private emit(event: SyncEvent): void {
     for (const handler of this.handlers) {
