@@ -28,8 +28,21 @@ async function bootstrap() {
 
   // ── Security & middleware ──────────────────────────────────
   app.use(helmet());
+  const allowedOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());
   app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      // Allow if wildcard or origin is in the list
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      // Also allow any *.vercel.app origin for preview deploys
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      callback(null, true); // In production demo, allow all for now
+    },
     credentials: true,
   }));
   app.use(express.json({ limit: '1mb' }));
