@@ -138,6 +138,7 @@ export default function BoardPage() {
 
     const demoClient = createDemoSyncClientIfNeeded({ url: WS_URL, token });
     const client = demoClient ?? new SyncClient({ url: WS_URL, token });
+    console.log(`[DSync] Board sync client: ${demoClient ? 'DemoSyncClient (localStorage)' : `RealSyncClient (${WS_URL})`}`);
     clientRef.current = client as SyncClient;
 
     const handler = (event: SyncEvent) => {

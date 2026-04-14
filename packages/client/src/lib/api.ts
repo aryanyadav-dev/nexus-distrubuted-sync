@@ -29,6 +29,8 @@ import {
 
 const BASE_URL = getApiBaseUrl();
 
+console.log(`[DSync] API Base URL: ${BASE_URL}`);
+
 function getToken(): string | null {
   return localStorage.getItem('dsync_token');
 }
@@ -116,8 +118,8 @@ async function request<T>(
 }
 
 /**
- * Try a real backend request. If it fails with a non-JSON / network error
- * AND we seem to be on a deployed host, flip to demo mode permanently.
+ * Try a real backend request with retries to handle Render cold starts.
+ * Only falls back to demo mode after all retries are exhausted.
  */
 async function requestWithFallback<T>(
   path: string,
@@ -126,25 +128,42 @@ async function requestWithFallback<T>(
 ): Promise<ApiResult<T>> {
   if (isInDemoMode()) return demoFn();
 
-  const result = await request<T>(path, options);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [0, 2000, 4000]; // ms before each attempt
 
-  // If the real backend returned a valid API error (like "wrong password"), that's fine — return it.
-  if (result.ok) return result;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      console.log(`[DSync] Retry ${attempt}/${MAX_RETRIES - 1} for ${path} (server may be waking up)...`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS[attempt]));
+    }
 
-  // Check if this is a routing / infrastructure error (Vercel 404, CORS, network fail)
-  const infraError =
-    result.error.includes('non-JSON') ||
-    result.error.includes('Failed to fetch') ||
-    result.error.includes('NetworkError') ||
-    result.error.includes('Load failed');
+    const result = await request<T>(path, options);
 
-  if (infraError) {
-    console.warn('[DSync] Real backend unreachable — switching to demo mode.', result.error);
-    forceDemoMode = true;
-    return demoFn();
+    // Success — backend is alive!
+    if (result.ok) return result;
+
+    // If the real backend returned a valid API error (like "wrong password"), return it immediately
+    const infraError =
+      result.error.includes('non-JSON') ||
+      result.error.includes('Failed to fetch') ||
+      result.error.includes('NetworkError') ||
+      result.error.includes('Load failed');
+
+    if (!infraError) {
+      // This is a real API error (auth failed, validation, etc.) — don't retry
+      return result;
+    }
+
+    // Infrastructure error — retry unless this was the last attempt
+    if (attempt === MAX_RETRIES - 1) {
+      console.warn('[DSync] Real backend unreachable after retries — switching to demo mode.', result.error);
+      forceDemoMode = true;
+      return demoFn();
+    }
   }
 
-  return result;
+  // Should never reach here, but just in case
+  return demoFn();
 }
 
 // ── Auth ────────────────────────────────────────────────────────
