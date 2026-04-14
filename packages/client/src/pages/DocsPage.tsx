@@ -85,7 +85,26 @@ function normalizeContent(content: Record<string, unknown> | null | undefined): 
 }
 
 function mergeContent(current: DocContent, patch: Partial<DocContent>): DocContent {
-  return normalizeContent({ ...current, ...patch });
+  const nestedKeys = new Set(['tasks', 'comments']);
+  const merged: Record<string, unknown> = { ...current };
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (nestedKeys.has(key) && typeof value === 'object' && !Array.isArray(value) && value !== null) {
+      const existing = { ...((merged[key] as Record<string, unknown>) || {}) };
+      for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
+        if (subValue === null) {
+          delete existing[subKey];
+        } else {
+          existing[subKey] = subValue;
+        }
+      }
+      merged[key] = existing;
+    } else {
+      merged[key] = value;
+    }
+  }
+
+  return normalizeContent(merged);
 }
 
 export default function DocsPage() {
