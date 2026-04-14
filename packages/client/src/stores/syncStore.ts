@@ -120,20 +120,23 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   clearLogs: () => set({ logs: [] }),
 }));
 
-/** Simple shallow merge + nested items merge for checklist */
+/** Deep merge with nested object support for items, tasks, comments, and chat messages */
 function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
   const result = { ...target };
+  // Keys that should be merged as nested objects (not replaced wholesale)
+  const nestedKeys = new Set(['items', 'tasks', 'comments']);
+
   for (const [key, value] of Object.entries(source)) {
-    if (key === 'items' && typeof value === 'object' && !Array.isArray(value) && value !== null) {
-      const itemsResult = { ...(result.items as Record<string, unknown> || {}) };
-      for (const [itemKey, itemValue] of Object.entries(value)) {
-        if (itemValue === null) {
-          delete itemsResult[itemKey];
+    if (nestedKeys.has(key) && typeof value === 'object' && !Array.isArray(value) && value !== null) {
+      const existing = { ...(result[key] as Record<string, unknown> || {}) };
+      for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
+        if (subValue === null) {
+          delete existing[subKey];
         } else {
-          itemsResult[itemKey] = itemValue;
+          existing[subKey] = subValue;
         }
       }
-      result.items = itemsResult;
+      result[key] = existing;
     } else {
       result[key] = value;
     }

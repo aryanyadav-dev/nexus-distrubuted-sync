@@ -95,13 +95,14 @@ export async function applyMutation(params: ApplyMutationParams): Promise<ApplyM
     );
 
     // 3. Build field set changed by others
+    const nestedConflictKeys = new Set(['items', 'tasks', 'comments']);
     const changedFieldsSinceBase = new Set<string>();
     for (const row of deltaRes.rows) {
       const patch = row.patch as Record<string, unknown>;
       for (const [field, value] of Object.entries(patch)) {
-        if (field === 'items' && typeof value === 'object' && value !== null) {
-          for (const itemKey of Object.keys(value as Record<string, unknown>)) {
-            changedFieldsSinceBase.add(`items.${itemKey}`);
+        if (nestedConflictKeys.has(field) && typeof value === 'object' && value !== null) {
+          for (const subKey of Object.keys(value as Record<string, unknown>)) {
+            changedFieldsSinceBase.add(`${field}.${subKey}`);
           }
         } else {
           changedFieldsSinceBase.add(field);
@@ -117,28 +118,25 @@ export async function applyMutation(params: ApplyMutationParams): Promise<ApplyM
     const cleanPatch: Record<string, unknown> = {};
 
     for (const [field, value] of Object.entries(params.patch)) {
-      if (field === 'items' && typeof value === 'object' && value !== null) {
-        const cleanItems: Record<string, unknown> = {};
-        const clientItemsValue = value as Record<string, unknown>;
-        let hasConflict = false;
+      if (nestedConflictKeys.has(field) && typeof value === 'object' && value !== null) {
+        const cleanSubItems: Record<string, unknown> = {};
+        const clientSubValues = value as Record<string, unknown>;
         
-        for (const [itemKey, itemValue] of Object.entries(clientItemsValue)) {
-          const path = `items.${itemKey}`;
+        for (const [subKey, subValue] of Object.entries(clientSubValues)) {
+          const path = `${field}.${subKey}`;
           if (changedFieldsSinceBase.has(path)) {
             conflictingFields.push(path);
-            hasConflict = true;
-            // Provide a partial view of the conflict for this specific item
-            clientConflictValues[path] = itemValue;
-            const currentItems = currentContent.items as Record<string, unknown> | undefined;
-            serverConflictValues[path] = currentItems?.[itemKey];
-            resolvedConflictValues[path] = currentItems?.[itemKey];
+            clientConflictValues[path] = subValue;
+            const currentNested = currentContent[field] as Record<string, unknown> | undefined;
+            serverConflictValues[path] = currentNested?.[subKey];
+            resolvedConflictValues[path] = currentNested?.[subKey];
           } else {
-            cleanItems[itemKey] = itemValue;
+            cleanSubItems[subKey] = subValue;
           }
         }
         
-        if (Object.keys(cleanItems).length > 0) {
-          cleanPatch.items = cleanItems;
+        if (Object.keys(cleanSubItems).length > 0) {
+          cleanPatch[field] = cleanSubItems;
         }
       } else {
         if (changedFieldsSinceBase.has(field)) {
@@ -163,20 +161,21 @@ export async function applyMutation(params: ApplyMutationParams): Promise<ApplyM
         : null;
 
     // 5. Build new content: current + clean patch using deep merge
+    const nestedKeys = new Set(['items', 'tasks', 'comments']);
     function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
       const result = { ...target };
       for (const [key, value] of Object.entries(source)) {
-        if (key === 'items' && typeof value === 'object' && !Array.isArray(value) && value !== null) {
-      const itemsResult = { ...(result.items as Record<string, unknown> || {}) };
-      for (const [itemKey, itemValue] of Object.entries(value)) {
-        if (itemValue === null) {
-          delete itemsResult[itemKey];
+        if (nestedKeys.has(key) && typeof value === 'object' && !Array.isArray(value) && value !== null) {
+          const existing = { ...(result[key] as Record<string, unknown> || {}) };
+          for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
+            if (subValue === null) {
+              delete existing[subKey];
+            } else {
+              existing[subKey] = subValue;
+            }
+          }
+          result[key] = existing;
         } else {
-          itemsResult[itemKey] = itemValue;
-        }
-      }
-      result.items = itemsResult;
-    } else {
           result[key] = value;
         }
       }
