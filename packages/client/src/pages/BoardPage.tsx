@@ -806,20 +806,36 @@ function KanbanCard({
         {/* Text and Badges */}
         <div className="flex-1 min-w-0">
           {isEditing ? (
-            <input
-              className="bg-transparent border-b border-neutral-600 text-sm outline-none w-full"
-              value={editingText}
-              onChange={(e) => onEditingTextChange(e.target.value)}
-              onBlur={onSaveEdit}
-              onKeyDown={(e) => { if (e.key === 'Enter') onSaveEdit(); if (e.key === 'Escape') onCancelEdit(); }}
-              autoFocus
-            />
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 bg-black/40 border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                value={editingText}
+                onChange={(e) => onEditingTextChange(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') onSaveEdit(); if (e.key === 'Escape') onCancelEdit(); }}
+                autoFocus
+              />
+              <button
+                onClick={onSaveEdit}
+                className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                title="Save"
+              >
+                <HiCheck className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onCancelEdit}
+                className="p-1.5 text-neutral-500 hover:text-neutral-400 hover:bg-white/5 rounded-lg transition-colors"
+                title="Cancel"
+              >
+                <HiOutlineXMark className="w-4 h-4" />
+              </button>
+            </div>
           ) : (
             <div
               className={`text-sm cursor-pointer hover:text-neutral-300 transition-colors ${
                 item.completed ? 'line-through text-neutral-600' : 'text-white'
               }`}
               onDoubleClick={onStartEdit}
+              title="Double-click to edit"
             >
               {item.text}
             </div>
@@ -855,14 +871,19 @@ function KanbanCard({
 
         {/* Actions */}
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onOpenDetails} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Edit Details">
-            <HiOutlinePencil className="w-3.5 h-3.5" />
+          <button onClick={onStartEdit} className="text-neutral-500 hover:text-white p-1.5 transition-colors rounded-lg hover:bg-white/10" title="Edit Name">
+            <HiOutlinePencil className="w-4 h-4" />
           </button>
-          <button onClick={onStartNote} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Note">
-            <HiOutlineChatBubbleLeftRight className="w-3.5 h-3.5" />
+          <button onClick={onOpenDetails} className="text-neutral-500 hover:text-white p-1.5 transition-colors rounded-lg hover:bg-white/10" title="Edit Details (Priority, Assignee, Due Date)">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+            </svg>
           </button>
-          <button onClick={onDelete} className="text-neutral-600 hover:text-white p-1 transition-colors" title="Delete">
-            <HiOutlineTrash className="w-3.5 h-3.5" />
+          <button onClick={onStartNote} className="text-neutral-500 hover:text-white p-1.5 transition-colors rounded-lg hover:bg-white/10" title="Add Note">
+            <HiOutlineChatBubbleLeftRight className="w-4 h-4" />
+          </button>
+          <button onClick={onDelete} className="text-neutral-500 hover:text-red-400 p-1.5 transition-colors rounded-lg hover:bg-white/10" title="Delete">
+            <HiOutlineTrash className="w-4 h-4" />
           </button>
         </div>
       </div>
